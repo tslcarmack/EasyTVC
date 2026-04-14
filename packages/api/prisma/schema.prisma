@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String?
+  avatar    String?
+  projects  Project[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canvas    Canvas?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("projects")
+}
+
+model Canvas {
+  id        String       @id @default(cuid())
+  projectId String       @unique @map("project_id")
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  viewport  Json?
+  nodes     CanvasNode[]
+  edges     CanvasEdge[]
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@map("canvases")
+}
+
+model CanvasNode {
+  id        String   @id @default(cuid())
+  canvasId  String   @map("canvas_id")
+  canvas    Canvas   @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  type      String
+  positionX Float    @map("position_x")
+  positionY Float    @map("position_y")
+  width     Float?
+  height    Float?
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([canvasId])
+  @@map("canvas_nodes")
+}
+
+model CanvasEdge {
+  id           String   @id @default(cuid())
+  canvasId     String   @map("canvas_id")
+  canvas       Canvas   @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  sourceNodeId String   @map("source_node_id")
+  targetNodeId String   @map("target_node_id")
+  sourceHandle String?  @map("source_handle")
+  targetHandle String?  @map("target_handle")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([canvasId])
+  @@map("canvas_edges")
+}
+
+model UploadedFile {
+  id           String   @id @default(cuid())
+  originalName String   @map("original_name")
+  storedName   String   @map("stored_name")
+  mimeType     String   @map("mime_type")
+  size         Int
+  userId       String   @map("user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("uploaded_files")
+}
+
+model GenerationTask {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  projectId     String?  @map("project_id")
+  nodeId        String?  @map("node_id")
+  type          String
+  status        String   @default("pending")
+  provider      String
+  model         String
+  prompt        String?
+  config        Json?
+  inputFileUrl  String?  @map("input_file_url")
+  inputFileUrl2 String?  @map("input_file_url_2")
+  resultUrl     String?  @map("result_url")
+  resultText    String?  @map("result_text")
+  error         String?
+  progress      Int      @default(0)
+  externalId    String?  @map("external_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@map("generation_tasks")
+}
