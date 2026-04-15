@@ -22,7 +22,7 @@ RUN pnpm --filter @easytvc/api db:generate
 RUN pnpm --filter @easytvc/api build
 
 # pnpm deploy creates a standalone directory with all prod deps (no symlinks)
-RUN pnpm --filter @easytvc/api deploy --prod /app/deployed
+RUN pnpm --filter @easytvc/api deploy --prod --legacy /app/deployed
 
 # Copy Prisma generated client into deployed node_modules
 RUN cp -r node_modules/.prisma /app/deployed/node_modules/.prisma 2>/dev/null || true
