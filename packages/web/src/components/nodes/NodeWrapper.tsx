@@ -1,6 +1,6 @@
 import { type ReactNode, useState, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
-import { Plus, Pencil, SquarePen } from 'lucide-react';
+import { Pencil, SquarePen } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface NodeWrapperProps {
@@ -35,6 +35,7 @@ export function NodeWrapper({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(title);
   const [isHovered, setIsHovered] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<{
@@ -46,6 +47,7 @@ export function NodeWrapper({
   } | null>(null);
 
   const setEditingNode = useCanvasStore((s) => s.setEditingNode);
+  const updateNodeStyle = useCanvasStore((s) => s.updateNodeStyle);
   const reactFlow = useReactFlow();
 
   useEffect(() => {
@@ -132,13 +134,7 @@ export function NodeWrapper({
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
 
-        reactFlow.setNodes((nds) =>
-          nds.map((n) =>
-            n.id === nodeId
-              ? { ...n, style: { ...n.style, width: finalW, height: finalH } }
-              : n,
-          ),
-        );
+        updateNodeStyle(nodeId, finalW, finalH);
       };
 
       document.addEventListener('mousemove', onMove);
@@ -146,6 +142,24 @@ export function NodeWrapper({
     },
     [minWidth, minHeight, reactFlow, nodeId],
   );
+
+  const handleMouseEnter = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => setIsHovered(false), 250);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    };
+  }, []);
 
   return (
     <div
@@ -156,8 +170,8 @@ export function NodeWrapper({
           : 'border-[var(--color-border)]'
       }`}
       style={{ minWidth: `${minWidth}px` }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Left connector */}
       <Handle
@@ -165,13 +179,6 @@ export function NodeWrapper({
         position={Position.Left}
         className="!w-3 !h-3 !bg-[var(--color-primary)] !border-[var(--color-surface)] !z-30"
       />
-
-      {/* Left + button */}
-      <div className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity group-hover/node:opacity-60">
-        <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-white hover:border-[var(--color-primary)] cursor-pointer">
-          <Plus size={12} />
-        </div>
-      </div>
 
       {/* Top action (upload button) */}
       {isEditing && topAction && (
@@ -182,7 +189,12 @@ export function NodeWrapper({
 
       {/* ── Hover toolbar ── */}
       {isHovered && !isEditing && (
-        <div className="absolute -top-9 right-2 z-20 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-1 shadow-xl">
+        <div
+          className="absolute right-2 z-20 flex items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-1.5 py-1 shadow-xl"
+          style={{ top: 0, transform: 'translateY(-100%)' }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
           {hoverActions}
           <button
             onClick={handleEditClick}
@@ -249,13 +261,6 @@ export function NodeWrapper({
         position={Position.Right}
         className="!w-3 !h-3 !bg-[var(--color-primary)] !border-[var(--color-surface)] !z-30"
       />
-
-      {/* Right + button */}
-      <div className="absolute -right-6 top-1/2 -translate-y-1/2 opacity-0 hover:opacity-100 transition-opacity group-hover/node:opacity-60">
-        <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:text-white hover:border-[var(--color-primary)] cursor-pointer">
-          <Plus size={12} />
-        </div>
-      </div>
 
       {/* ── Resize handles (positioned away from connection handles) ── */}
       {/* Bottom edge */}

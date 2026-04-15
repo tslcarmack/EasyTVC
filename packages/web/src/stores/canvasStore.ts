@@ -63,6 +63,7 @@ interface CanvasState {
   addNode: (type: NodeType, position: XYPosition) => void;
   addNodeWithEdge: (type: NodeType, position: XYPosition, sourceNodeId: string) => string;
   updateNodeData: (nodeId: string, data: Partial<EasyTVCNodeData>) => void;
+  updateNodeStyle: (nodeId: string, width: number, height: number) => void;
   removeNodes: (ids: string[]) => void;
   removeEdges: (ids: string[]) => void;
   loadCanvas: (nodes: FlowNode[], edges: FlowEdge[]) => void;
@@ -214,6 +215,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => ({
       nodes: state.nodes.map((n) =>
         n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n,
+      ),
+      isDirty: true,
+    }));
+  },
+
+  updateNodeStyle: (nodeId, width, height) => {
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === nodeId ? { ...n, style: { ...n.style, width, height } } : n,
       ),
       isDirty: true,
     }));

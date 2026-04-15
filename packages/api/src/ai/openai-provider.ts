@@ -76,6 +76,20 @@ async function openaiRequest(reqPath: string, body: Record<string, unknown>, tim
       throw new Error(`OpenAI API error: ${err.error?.message || res.statusText}`);
     }
 
+    const contentType = res.headers.get('content-type') || '';
+
+    if (contentType.includes('text/event-stream')) {
+      const text = await res.text();
+      let lastData: any = null;
+      for (const line of text.split('\n')) {
+        if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+          try { lastData = JSON.parse(line.slice(6)); } catch { /* skip */ }
+        }
+      }
+      if (!lastData) throw new Error('SSE stream contained no valid data');
+      return lastData;
+    }
+
     return res.json();
   } finally {
     clearTimeout(timer);
@@ -94,6 +108,7 @@ export class OpenAIProvider implements AIProviderInterface {
       model: model || process.env.DEFAULT_TEXT_MODEL || 'gpt',
       messages,
       max_tokens: 4096,
+      stream: false,
     });
 
     return { resultText: data.choices[0].message.content };
@@ -103,22 +118,32 @@ export class OpenAIProvider implements AIProviderInterface {
     prompt: string,
     options?: { negativePrompt?: string; width?: number; height?: number; model?: string; referenceImageUrls?: string[] },
   ): Promise<GenerationResult> {
-    const model = options?.model || 'dall-e-3';
-    const isDalle = model.startsWith('dall-e');
+    const model = options?.model || 'gpt-image-1';
 
-    if (isDalle) {
+    const isChatBased = /gemini/i.test(model);
+
+    if (!isChatBased) {
       const size = this.resolveImageSize(options?.width, options?.height);
-      const data = await openaiRequest('/images/generations', {
-        model,
-        prompt,
-        n: 1,
-        size,
-        response_format: 'url',
-      });
-      return { resultUrl: data.data[0].url };
+      const body: Record<string, unknown> = { model, prompt, n: 1, size };
+
+      if (options?.referenceImageUrls?.length) {
+        const resolved: string[] = [];
+        for (const url of options.referenceImageUrls) {
+          resolved.push(await resolveImageToDataUri(url));
+        }
+        body.image = resolved;
+      }
+
+      const data = await openaiRequest('/images/generations', body);
+
+      if (data.data?.[0]?.url) return { resultUrl: data.data[0].url };
+      if (data.data?.[0]?.b64_json) {
+        return { resultUrl: `data:image/png;base64,${data.data[0].b64_json}` };
+      }
+
+      throw new Error('Image generation response did not contain image data');
     }
 
-    // Chat-based image generation (Gemini image models, etc.)
     const contentParts: Array<Record<string, unknown>> = [];
 
     if (options?.referenceImageUrls?.length) {
@@ -133,12 +158,11 @@ export class OpenAIProvider implements AIProviderInterface {
     const data = await openaiRequest('/chat/completions', {
       model,
       messages: [{ role: 'user', content: contentParts.length === 1 ? prompt : contentParts }],
+      stream: false,
     });
 
     const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new Error('No content in response');
 
-    // Check for inline image data in multipart response
     const parts = data.choices?.[0]?.message?.parts;
     if (parts) {
       for (const part of parts) {
@@ -148,13 +172,13 @@ export class OpenAIProvider implements AIProviderInterface {
       }
     }
 
-    // Some proxies embed base64 images in markdown: ![](data:image/...)
+    if (!content) throw new Error('No content in response');
+
     const dataUriMatch = content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
     if (dataUriMatch) {
       return { resultUrl: dataUriMatch[0] };
     }
 
-    // Some proxies return image URLs in markdown: ![](https://...)
     const urlMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
     if (urlMatch) {
       return { resultUrl: urlMatch[1] };
@@ -237,6 +261,7 @@ export class OpenAIProvider implements AIProviderInterface {
         },
       ],
       max_tokens: 2048,
+      stream: false,
     });
 
     return { resultText: data.choices[0].message.content };
@@ -258,6 +283,7 @@ export class OpenAIProvider implements AIProviderInterface {
     const data = await openaiRequest('/chat/completions', {
       model,
       messages: [{ role: 'user', content: contentParts }],
+      stream: false,
     });
 
     const content = data.choices?.[0]?.message?.content;
@@ -322,6 +348,7 @@ export class OpenAIProvider implements AIProviderInterface {
         },
       ],
       max_tokens: 4096,
+      stream: false,
     });
 
     return { resultText: data.choices[0].message.content };
@@ -341,6 +368,7 @@ export class OpenAIProvider implements AIProviderInterface {
     const data = await openaiRequest('/chat/completions', {
       model,
       messages: [{ role: 'user', content: contentParts }],
+      stream: false,
     }, 300_000);
 
     const content = data.choices?.[0]?.message?.content;
@@ -372,6 +400,7 @@ export class OpenAIProvider implements AIProviderInterface {
     const body: Record<string, unknown> = {
       model,
       messages: [{ role: 'user', content: contentParts.length === 1 ? prompt : contentParts }],
+      stream: false,
     };
 
     const data = await openaiRequest('/chat/completions', body, 300_000);

@@ -215,11 +215,22 @@ function CanvasInner() {
     }
   }, [editingNodeId, setEditingNode]);
 
+  const connectionMadeRef = useRef(false);
+
   const handleConnectStart = useCallback(
     (_: any, params: { nodeId: string | null; handleType: string | null }) => {
       connectingNodeRef.current = params.nodeId;
+      connectionMadeRef.current = false;
     },
     [],
+  );
+
+  const handleConnect = useCallback(
+    (connection: Parameters<typeof onConnect>[0]) => {
+      connectionMadeRef.current = true;
+      onConnect(connection);
+    },
+    [onConnect],
   );
 
   const handleConnectEnd = useCallback(
@@ -228,8 +239,11 @@ function CanvasInner() {
       connectingNodeRef.current = null;
       if (!sourceId) return;
 
+      if (connectionMadeRef.current) return;
+
       const target = (event as MouseEvent).target as HTMLElement;
       if (target?.closest('.react-flow__handle')) return;
+      if (target?.closest('.react-flow__node')) return;
 
       const sourceNode = nodes.find((n) => n.id === sourceId);
       if (!sourceNode) return;
@@ -333,7 +347,7 @@ function CanvasInner() {
           edges={edges}
           onNodesChange={handleNodesChangeWithHistory}
           onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
+          onConnect={handleConnect}
           onConnectStart={handleConnectStart}
           onConnectEnd={handleConnectEnd}
           onDoubleClick={handleDoubleClick}

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { authenticate, getUserFromRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import fs from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
@@ -30,13 +31,7 @@ export async function uploadRoutes(app: FastifyInstance) {
     const storedName = `${crypto.randomUUID()}${ext}`;
     const filePath = path.join(UPLOAD_DIR, storedName);
 
-    const writeStream = fs.createWriteStream(filePath);
-    await file.file.pipe(writeStream);
-
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
-    });
+    await pipeline(file.file, fs.createWriteStream(filePath));
 
     const stat = fs.statSync(filePath);
 
