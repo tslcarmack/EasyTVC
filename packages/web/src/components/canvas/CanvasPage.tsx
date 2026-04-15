@@ -12,6 +12,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { NodeType } from '@easytvc/shared';
+import { Save, Check, Loader2 } from 'lucide-react';
 import { apiFetch } from '../../api/client';
 import { useCanvasStore, type EasyTVCNodeData } from '../../stores/canvasStore';
 import { CanvasToolbar } from '../toolbar/CanvasToolbar';
@@ -58,7 +59,7 @@ function CanvasInner() {
   const reactFlowInstance = useReactFlow();
   const [projectName, setProjectName] = useState('');
   const [loading, setLoading] = useState(true);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const connectingNodeRef = useRef<string | null>(null);
   const [connMenu, setConnMenu] = useState<ConnMenuState | null>(null);
 
@@ -151,43 +152,36 @@ function CanvasInner() {
     load();
   }, [projectId, setProjectId, loadCanvas]);
 
-  // Auto-save
-  useEffect(() => {
-    if (!isDirty || !projectId) return;
-
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-
-    saveTimerRef.current = setTimeout(async () => {
-      const viewport = reactFlowInstance.getViewport();
-      await apiFetch(`/canvas/${projectId}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          viewport,
-          nodes: nodes.map((n) => ({
-            id: n.id,
-            type: n.type,
-            positionX: n.position.x,
-            positionY: n.position.y,
-            width: n.measured?.width ?? (n.style as Record<string, number>)?.width,
-            height: n.measured?.height ?? (n.style as Record<string, number>)?.height,
-            data: n.data,
-          })),
-          edges: edges.map((e) => ({
-            id: e.id,
-            sourceNodeId: e.source,
-            targetNodeId: e.target,
-            sourceHandle: e.sourceHandle,
-            targetHandle: e.targetHandle,
-          })),
-        }),
-      });
-      markClean();
-    }, 2000);
-
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, [isDirty, nodes, edges, projectId, markClean]);
+  const handleSave = useCallback(async () => {
+    if (!projectId || saveStatus === 'saving') return;
+    setSaveStatus('saving');
+    const viewport = reactFlowInstance.getViewport();
+    await apiFetch(`/canvas/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        viewport,
+        nodes: nodes.map((n) => ({
+          id: n.id,
+          type: n.type,
+          positionX: n.position.x,
+          positionY: n.position.y,
+          width: n.measured?.width ?? (n.style as Record<string, number>)?.width,
+          height: n.measured?.height ?? (n.style as Record<string, number>)?.height,
+          data: n.data,
+        })),
+        edges: edges.map((e) => ({
+          id: e.id,
+          sourceNodeId: e.source,
+          targetNodeId: e.target,
+          sourceHandle: e.sourceHandle,
+          targetHandle: e.targetHandle,
+        })),
+      }),
+    });
+    markClean();
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 1500);
+  }, [projectId, saveStatus, nodes, edges, markClean, reactFlowInstance]);
 
   const handleDoubleClick = useCallback(
     (event: React.MouseEvent) => {
@@ -292,6 +286,11 @@ function CanvasInner() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -306,7 +305,7 @@ function CanvasInner() {
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleSave]);
 
   function handleNodesChangeWithHistory(...args: Parameters<typeof onNodesChange>) {
     onNodesChange(...args);
@@ -362,11 +361,34 @@ function CanvasInner() {
 
         {nodes.length === 0 && <EmptyCanvasOverlay />}
 
-        {isDirty && (
-          <div className="absolute right-4 top-4 rounded-full bg-yellow-500/20 px-3 py-1 text-xs text-yellow-400">
-            Saving...
-          </div>
-        )}
+        {/* ── Top-right canvas toolbar ── */}
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+          {isDirty && saveStatus === 'idle' && (
+            <span className="text-xs text-yellow-400/80">未保存</span>
+          )}
+          {saveStatus === 'saved' && (
+            <span className="flex items-center gap-1 text-xs text-emerald-400">
+              <Check size={12} /> 已保存
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saveStatus === 'saving'}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-lg transition ${
+              isDirty && saveStatus !== 'saving'
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30'
+                : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            } disabled:cursor-not-allowed disabled:opacity-50`}
+            title="保存 (Ctrl+S)"
+          >
+            {saveStatus === 'saving' ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Save size={13} />
+            )}
+            {saveStatus === 'saving' ? '保存中…' : '保存'}
+          </button>
+        </div>
 
         <TimelinePanel />
       </div>

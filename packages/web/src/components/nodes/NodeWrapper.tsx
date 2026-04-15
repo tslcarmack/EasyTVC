@@ -126,15 +126,25 @@ export function NodeWrapper({
       };
 
       const onUp = () => {
+        const finalW = el.offsetWidth;
+        const finalH = el.offsetHeight;
         resizeRef.current = null;
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
+
+        reactFlow.setNodes((nds) =>
+          nds.map((n) =>
+            n.id === nodeId
+              ? { ...n, style: { ...n.style, width: finalW, height: finalH } }
+              : n,
+          ),
+        );
       };
 
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     },
-    [minWidth, minHeight, reactFlow],
+    [minWidth, minHeight, reactFlow, nodeId],
   );
 
   return (
@@ -153,7 +163,7 @@ export function NodeWrapper({
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-[var(--color-primary)] !border-[var(--color-surface)]"
+        className="!w-3 !h-3 !bg-[var(--color-primary)] !border-[var(--color-surface)] !z-30"
       />
 
       {/* Left + button */}
@@ -237,7 +247,7 @@ export function NodeWrapper({
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-[var(--color-primary)] !border-[var(--color-surface)]"
+        className="!w-3 !h-3 !bg-[var(--color-primary)] !border-[var(--color-surface)] !z-30"
       />
 
       {/* Right + button */}
@@ -247,27 +257,20 @@ export function NodeWrapper({
         </div>
       </div>
 
-      {/* ── Resize handles ── */}
-      {/* Right edge */}
-      <div
-        className="nodrag absolute top-0 -right-[3px] w-[6px] h-full cursor-e-resize opacity-0 hover:opacity-100 group-hover/node:opacity-40 transition-opacity"
-        onMouseDown={(e) => onResizeStart(e, 'e')}
-      >
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-[3px] rounded-full bg-[var(--color-primary)]" />
-      </div>
+      {/* ── Resize handles (positioned away from connection handles) ── */}
       {/* Bottom edge */}
       <div
-        className="nodrag absolute -bottom-[3px] left-0 h-[6px] w-full cursor-s-resize opacity-0 hover:opacity-100 group-hover/node:opacity-40 transition-opacity"
+        className="nodrag nopan absolute -bottom-[4px] left-4 right-4 h-[8px] cursor-s-resize opacity-0 hover:opacity-100 group-hover/node:opacity-40 transition-opacity"
         onMouseDown={(e) => onResizeStart(e, 's')}
       >
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full bg-[var(--color-primary)]" />
+        <div className="absolute bottom-[2px] left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full bg-[var(--color-primary)]" />
       </div>
       {/* Bottom-right corner */}
       <div
-        className="nodrag absolute -bottom-[4px] -right-[4px] h-3 w-3 cursor-se-resize opacity-0 hover:opacity-100 group-hover/node:opacity-60 transition-opacity"
+        className="nodrag nopan absolute -bottom-[5px] -right-[5px] h-[14px] w-[14px] cursor-se-resize opacity-0 hover:opacity-100 group-hover/node:opacity-60 transition-opacity"
         onMouseDown={(e) => onResizeStart(e, 'se')}
       >
-        <div className="absolute bottom-0 right-0 h-2 w-2 rounded-br-md border-b-2 border-r-2 border-[var(--color-primary)]" />
+        <div className="absolute bottom-[2px] right-[2px] h-[8px] w-[8px] rounded-br-md border-b-2 border-r-2 border-[var(--color-primary)]" />
       </div>
     </div>
   );
