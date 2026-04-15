@@ -128,7 +128,7 @@ export function ReferenceSelector({
 
       {/* Picker dropdown */}
       {showPicker && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 min-w-[260px] max-h-[240px] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-xl">
+        <div className="absolute bottom-full left-0 mb-1 z-50 min-w-[260px] max-h-[240px] overflow-y-auto node-scroll rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-xl">
           {availableNodes.length === 0 ? (
             <div className="px-3 py-2 text-xs text-[var(--color-text-secondary)]">
               No available nodes

@@ -35,6 +35,7 @@ export function NodeWrapper({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(title);
   const [isHovered, setIsHovered] = useState(false);
+  const [resizeGhost, setResizeGhost] = useState<{ w: number; h: number } | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -123,18 +124,23 @@ export function NodeWrapper({
         if (r.handle.includes('s')) newH = Math.max(minHeight, r.startH + dy);
         if (r.handle.includes('w')) newW = Math.max(minWidth, r.startW - dx);
 
-        el.style.width = `${newW}px`;
-        el.style.height = `${newH}px`;
+        setResizeGhost({ w: newW, h: newH });
       };
 
       const onUp = () => {
-        const finalW = el.offsetWidth;
-        const finalH = el.offsetHeight;
+        const ghost = resizeRef.current;
         resizeRef.current = null;
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
 
-        updateNodeStyle(nodeId, finalW, finalH);
+        setResizeGhost((prev) => {
+          if (prev) {
+            updateNodeStyle(nodeId, prev.w, prev.h);
+            el.style.width = `${prev.w}px`;
+            el.style.height = `${prev.h}px`;
+          }
+          return null;
+        });
       };
 
       document.addEventListener('mousemove', onMove);
@@ -244,9 +250,17 @@ export function NodeWrapper({
       </div>
 
       {/* Content */}
-      <div className="p-3 overflow-auto" style={{ maxHeight: 'calc(100% - 40px)' }}>
+      <div className="node-scroll p-3 overflow-auto" style={{ maxHeight: 'calc(100% - 40px)' }}>
         {children}
       </div>
+
+      {/* Resize ghost overlay */}
+      {resizeGhost && (
+        <div
+          className="pointer-events-none absolute inset-0 z-40 rounded-xl border-2 border-dashed border-[var(--color-primary)]"
+          style={{ width: resizeGhost.w, height: resizeGhost.h }}
+        />
+      )}
 
       {/* Prompt bar (only in edit mode) */}
       {isEditing && promptBar && (

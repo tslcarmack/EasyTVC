@@ -57,7 +57,7 @@ export const TableNodeComponent = memo(function TableNode({ id, data }: NodeProp
 
   return (
     <NodeWrapper nodeId={id} title={nodeData.label || 'Table'} icon={<Table size={14} />} color="#06b6d4" onRename={handleRename}>
-      <div className="nodrag nowheel overflow-auto">
+      <div className="nodrag nowheel overflow-auto node-scroll">
         <table className="w-full text-xs">
           <thead>
             <tr>
