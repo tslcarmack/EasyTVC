@@ -25,10 +25,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-easytvc-production-secret-change-me}
       PORT: "4000"
       HOST: "0.0.0.0"
-      CORS_ORIGIN: http://localhost:3000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       UPLOAD_DIR: /app/uploads
       OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEFAULT_TEXT_MODEL: ${DEFAULT_TEXT_MODEL:-gpt-4o-mini}
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
     volumes:
       - uploads:/app/uploads

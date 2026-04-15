@@ -1,31 +1,44 @@
 FROM node:20-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.29.2 --activate
 WORKDIR /app
 
+# ── Install all dependencies ──
 FROM base AS deps
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/api/package.json packages/api/
-RUN pnpm install --frozen-lockfile --prod=false
+RUN pnpm install --frozen-lockfile
 
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
-COPY --from=deps /app/packages/api/node_modules ./packages/api/node_modules
-COPY . .
+# ── Build shared + API ──
+FROM deps AS build
+COPY packages/shared/ packages/shared/
+COPY packages/api/ packages/api/
+
+RUN pnpm --filter @easytvc/shared build
+# Point shared's main to compiled JS so Node.js can resolve it at runtime
+RUN sed -i 's|"./src/index.ts"|"./dist/index.js"|g' packages/shared/package.json
+
 RUN pnpm --filter @easytvc/api db:generate
 RUN pnpm --filter @easytvc/api build
 
-FROM base AS runtime
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages/api/dist ./packages/api/dist
-COPY --from=build /app/packages/api/prisma ./packages/api/prisma
-COPY --from=build /app/packages/api/package.json ./packages/api/
-COPY --from=build /app/packages/shared ./packages/shared
-COPY --from=build /app/package.json ./
+# pnpm deploy creates a standalone directory with all prod deps (no symlinks)
+RUN pnpm --filter @easytvc/api deploy --prod /app/deployed
 
+# Copy Prisma generated client into deployed node_modules
+RUN cp -r node_modules/.prisma /app/deployed/node_modules/.prisma 2>/dev/null || true
+
+# ── Minimal production image ──
+FROM node:20-alpine AS production
+WORKDIR /app
+
+COPY --from=build /app/deployed ./
+
+ENV UPLOAD_DIR=/app/uploads
 RUN mkdir -p /app/uploads
 
-WORKDIR /app/packages/api
+COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 EXPOSE 4000
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

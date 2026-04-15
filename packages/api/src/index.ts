@@ -34,7 +34,9 @@ async function start() {
     limits: { fileSize: 100 * 1024 * 1024 },
   });
 
-  const uploadsDir = path.resolve(__dirname, '..', 'uploads');
+  const uploadsDir = process.env.UPLOAD_DIR
+    ? path.resolve(process.env.UPLOAD_DIR)
+    : path.resolve(__dirname, '..', 'uploads');
   await app.register(fastifyStatic, {
     root: uploadsDir,
     prefix: '/api/files/',
